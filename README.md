@@ -74,6 +74,39 @@ See `.env.example`. Summary:
   `HIGGSFIELD_ENDPOINT_MAP` overrides model→endpoint paths without a redeploy.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_*` — billing.
 
+## Deploying
+
+The generated Prisma client lives in `src/generated/prisma` and is gitignored,
+so it does not exist in a fresh clone. `prisma generate` therefore runs in both
+`postinstall` and `build` — `postinstall` covers a plain `npm install`, and
+keeping it in `build` too covers a platform restoring a dependency cache and
+skipping the install step. Dropping either one fails the build with
+`Module not found: Can't resolve '@/generated/prisma/client'`.
+
+`prisma generate` does not need a database, so the build succeeds with no
+environment variables at all. Every route is server-rendered on demand, so
+nothing touches Postgres until a request arrives — which means a build can go
+green and the site still 500 at runtime if `DATABASE_URL` is missing.
+
+Set at minimum, on the deployment platform:
+
+- `DATABASE_URL` — pooled connection string. `prisma dev` is local-only; use
+  Neon, Supabase or another hosted Postgres.
+- `APP_URL` — the deployed origin, e.g. `https://adamantite.example`. Stripe
+  redirects and provider webhooks are built from it.
+- `OWNER_EMAIL`, `WEBHOOK_SECRET`.
+
+Then apply migrations against the production database once, from a machine with
+that `DATABASE_URL` exported:
+
+```bash
+npx prisma migrate deploy
+```
+
+Provider and Stripe keys stay optional: without them generation returns a clear
+"not configured" error and plans stay on the free tier, so a deployment can be
+smoke-tested before the paid integrations are wired.
+
 ## Architecture notes
 
 - **Provider adapter** (`src/lib/providers`) — generation is behind a
@@ -99,7 +132,7 @@ See `.env.example`. Summary:
 
 ## Scripts
 
-- `npm run dev` / `build` / `start`
+- `npm run dev` / `build` / `start` — `build` runs `prisma generate` first
 - `npm run lint`
 - `npx prisma migrate deploy` — apply migrations
 - `npx prisma studio` — inspect the database

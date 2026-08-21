@@ -1,0 +1,172 @@
+// Adamantite H — AI Image & Video Creation Platform
+// Schema notes:
+//  - Sessions live in the DB (not JWTs) so the owner console can show a live
+//    green "active" dot and so the 1-hour idle logout in the spec is enforced
+//    server-side rather than trusted from the client.
+//  - Usage is metered in credits. Plan pools and per-model costs live in
+//    src/lib/plans.ts and src/lib/models.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  OWNER
+}
+
+enum PlanId {
+  FREE
+  PORT
+  STANDARD
+  PRO
+  MAX
+}
+
+enum SubscriptionStatus {
+  NONE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum GenerationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  displayName  String
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Denormalised billing state, kept in sync by the Stripe webhook.
+  plan               PlanId             @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(NONE)
+  stripeCustomerId   String?            @unique
+  stripeSubId        String?            @unique
+  // Start of the current metering window. Credits reset when this rolls over.
+  periodStart        DateTime           @default(now())
+  periodEnd          DateTime?
+
+  sessions    Session[]
+  projects    Project[]
+  generations Generation[]
+  usage       UsageEntry[]
+
+  @@index([plan])
+}
+
+// One row per login. `lastSeenAt` drives both the idle timeout and the
+// owner console's active indicator.
+model Session {
+  id         String    @id @default(cuid())
+  // SHA-256 of the cookie value; the raw token is never stored.
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  // Absolute cap, independent of activity.
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  ip         String?
+
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+model Project {
+  id        String    @id @default(cuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  // Soft delete — the spec wants a recoverable trash, not a hard delete.
+  trashedAt DateTime?
+
+  generations Generation[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, trashedAt])
+}
+
+model Generation {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind     MediaKind
+  modelId  String
+  prompt   String
+  // Set when this generation edits or extends an earlier one.
+  parentId String?
+  parent   Generation?  @relation("GenerationLineage", fields: [parentId], references: [id], onDelete: SetNull)
+  children Generation[] @relation("GenerationLineage")
+
+  status        GenerationStatus @default(QUEUED)
+  providerId    String?
+  providerJobId String?
+  outputUrl     String?
+  thumbnailUrl  String?
+  width         Int?
+  height        Int?
+  durationSec   Int?
+  seed          String?
+  error         String?
+
+  creditsCharged Int       @default(0)
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([status])
+  @@index([providerJobId])
+}
+
+// Append-only credit ledger. Debits are generations, credits are plan grants
+// and refunds for failed jobs.
+model UsageEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Negative = spend, positive = grant/refund.
+  delta        Int
+  reason       String
+  modelId      String?
+  generationId String?
+  createdAt    DateTime @default(now())
+  // Copy of User.periodStart at write time so a window's spend is a simple sum.
+  periodStart  DateTime
+
+  @@index([userId, periodStart])
+}
+
+// Guards against Stripe re-delivering the same event.
+model ProcessedWebhookEvent {
+  id          String   @id
+  processedAt DateTime @default(now())
+}

@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+/*
+ * Adamantite H design system.
+ *
+ * Taken from the approved mockups: near-black ground, a crimson core that
+ * bleeds green on the left edge and blue on the right, chamfered HUD panels,
+ * and a high-contrast serif logotype.
+ */
+
+@theme {
+  /* Ground */
+  --color-void: #050507;
+  --color-ink: #0a0a0e;
+  --color-panel: #101017;
+  --color-edge: #1e1e28;
+
+  /* Crimson core */
+  --color-crimson-50: #fff1f2;
+  --color-crimson-300: #ff6672;
+  --color-crimson-400: #ff2436;
+  --color-crimson-500: #e1121f;
+  --color-crimson-600: #b70d18;
+  --color-crimson-900: #3d0509;
+
+  /* Edge channels, used by the pixel-dust field */
+  --color-signal-green: #12b34a;
+  --color-signal-blue: #1b2fcb;
+  --color-signal-magenta: #ff3bd4;
+
+  /* Text */
+  --color-chrome: #f3f4f6;
+  --color-chrome-dim: #9ca3af;
+  --color-chrome-faint: #5b6070;
+
+  /*
+   * --font-kaluar / -raleway / -relevance are set on <html> by next/font/local.
+   * They are named per face rather than per role because next/font and this
+   * block both land on :root, so a token that referenced its own name would be
+   * a var() cycle and resolve to nothing.
+   */
+  --font-display: var(--font-kaluar), "Arial CE", Arial, serif;
+  --font-sans: var(--font-raleway), "Arial CE", Arial, sans-serif;
+  --font-label: var(--font-relevance), "Arial CE", Arial, sans-serif;
+
+  --radius-hud: 14px;
+}
+
+/*
+ * Arial CE is the last entry in every stack above. Declaring it here rather
+ * than relying on the installed system copy means the fallback is the same
+ * shipped file on every machine, so nothing ever resolves to a generic default.
+ */
+@font-face {
+  font-family: "Arial CE";
+  src: url("/fonts/arial-ce-400.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: var(--color-void);
+  color: var(--color-chrome);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-crimson-500);
+  color: #fff;
+}
+
+/* Focus ring that reads against the dark ground without fighting the glow. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-crimson-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /*
+   * Chamfered HUD panel from the mockups: notched top-left and bottom-right
+   * corners with a glowing rule. clip-path handles the notch; the glow is a
+   * layered inset/outset shadow rather than a border image so it animates.
+   */
+  .hud {
+    position: relative;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-panel) 92%, transparent),
+        color-mix(in srgb, var(--color-void) 88%, transparent)
+      );
+    border: 1px solid color-mix(in srgb, var(--color-crimson-500) 45%, transparent);
+    clip-path: polygon(
+      14px 0,
+      100% 0,
+      100% calc(100% - 14px),
+      calc(100% - 14px) 100%,
+      0 100%,
+      0 14px
+    );
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-crimson-900) 60%, transparent),
+      0 0 18px -4px color-mix(in srgb, var(--color-crimson-500) 55%, transparent),
+      inset 0 0 30px -18px var(--color-crimson-400);
+  }
+
+  .hud-magenta {
+    border-color: color-mix(in srgb, var(--color-signal-magenta) 50%, transparent);
+    box-shadow:
+      0 0 20px -4px color-mix(in srgb, var(--color-signal-magenta) 50%, transparent),
+      inset 0 0 34px -20px var(--color-signal-magenta);
+  }
+
+  /* Interactive lift for cards in the model grid. */
+  .hud-interactive {
+    transition:
+      box-shadow 220ms ease,
+      transform 220ms ease,
+      border-color 220ms ease;
+  }
+
+  .hud-interactive:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-crimson-400) 85%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-crimson-600) 70%, transparent),
+      0 0 34px -6px color-mix(in srgb, var(--color-crimson-400) 70%, transparent),
+      inset 0 0 40px -16px var(--color-crimson-400);
+  }
+
+  .hud-interactive[aria-pressed="true"],
+  .hud-interactive[data-selected="true"] {
+    border-color: var(--color-crimson-400);
+    box-shadow:
+      0 0 0 1px var(--color-crimson-500),
+      0 0 40px -6px color-mix(in srgb, var(--color-crimson-400) 80%, transparent);
+  }
+
+  .glow-text {
+    text-shadow:
+      0 0 12px color-mix(in srgb, var(--color-crimson-400) 70%, transparent),
+      0 0 34px color-mix(in srgb, var(--color-crimson-600) 45%, transparent);
+  }
+
+  /* Primary action. Kept flat with a glow rather than a gradient fill. */
+  .btn-primary {
+    background: linear-gradient(
+      180deg,
+      var(--color-crimson-500),
+      var(--color-crimson-600)
+    );
+    color: #fff;
+    border: 1px solid var(--color-crimson-400);
+    box-shadow: 0 0 20px -6px var(--color-crimson-400);
+    transition:
+      box-shadow 180ms ease,
+      filter 180ms ease;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    box-shadow: 0 0 28px -4px var(--color-crimson-400);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    border: 1px solid color-mix(in srgb, var(--color-crimson-500) 55%, transparent);
+    color: var(--color-chrome);
+    transition:
+      background 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-crimson-900) 55%, transparent);
+    border-color: var(--color-crimson-400);
+  }
+
+  .field {
+    background: color-mix(in srgb, var(--color-void) 80%, transparent);
+    border: 1px solid var(--color-edge);
+    color: var(--color-chrome);
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .field::placeholder {
+    color: var(--color-chrome-faint);
+  }
+
+  .field:focus {
+    border-color: var(--color-crimson-400);
+    box-shadow: 0 0 22px -8px var(--color-crimson-400);
+    outline: none;
+  }
+}
+
+@layer utilities {
+  /* Skeleton shimmer for pending generations. */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-panel) 90%, transparent) 25%,
+      color-mix(in srgb, var(--color-crimson-900) 70%, transparent) 37%,
+      color-mix(in srgb, var(--color-panel) 90%, transparent) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: 0 0;
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.75;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+/* Respect reduced-motion for every decorative animation on the site. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

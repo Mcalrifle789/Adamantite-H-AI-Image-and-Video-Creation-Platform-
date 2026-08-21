@@ -9,19 +9,46 @@ interface FieldError {
   message: string;
 }
 
+/*
+ * The OIDC callback can only communicate failure through a redirect, so it
+ * sends a short code and this turns it into something a person can act on.
+ * Unrecognised codes fall through to a generic line rather than being shown
+ * raw.
+ */
+const OAUTH_ERRORS: Record<string, string> = {
+  cancelled: "That sign-in was cancelled.",
+  provider_unavailable:
+    "That sign-in method is not enabled on this deployment yet.",
+  email_unverified:
+    "An account already uses that email address, but the provider has not verified you own it. Sign in with your password instead.",
+  no_email:
+    "That provider did not share an email address, which this site needs to create an account.",
+  bad_state: "That sign-in link expired or was tampered with. Try again.",
+  bad_callback: "That sign-in did not complete. Try again.",
+  exchange_failed: "The provider rejected the sign-in. Try again.",
+};
+
 /**
  * Shared login / registration form.
  *
  * Field-level errors from the API's zod issues are surfaced next to the input
  * they belong to; anything else becomes a single form-level alert.
  */
-export default function AuthForm({ mode }: { mode: "login" | "register" }) {
+export default function AuthForm({
+  mode,
+  providers,
+}: {
+  mode: "login" | "register";
+  /** Server-rendered Google/Microsoft buttons, or null when none are set up. */
+  providers?: React.ReactNode;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const isRegister = mode === "register";
 
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const oauthError = params.get("error");
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   const errorFor = (path: string) =>
@@ -89,12 +116,16 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
           : "Sign in to pick up where your projects left off."}
       </p>
 
-      {formError ? (
+      {providers}
+
+      {formError || oauthError ? (
         <p
           role="alert"
           className="border-crimson-500/60 bg-crimson-900/40 text-crimson-200 mt-5 rounded-md border px-3 py-2 text-sm"
         >
-          {formError}
+          {formError ??
+            OAUTH_ERRORS[oauthError!] ??
+            "That sign-in did not complete. Try again."}
         </p>
       ) : null}
 

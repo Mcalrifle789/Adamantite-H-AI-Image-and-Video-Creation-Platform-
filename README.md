@@ -14,8 +14,9 @@ PostgreSQL, Higgsfield for generation, and Stripe for billing.
   reads as a site rather than a funnel into the studio. The pricing table's
   per-tier allowances are derived from the credit maths, not hardcoded, so the
   headline numbers can never drift from what a plan actually buys.
-- **Auth** — email/password with database-backed sessions, a first-run owner
-  bootstrap, and a **server-enforced one-hour idle logout**.
+- **Auth** — email/password with database-backed sessions, **sign in with
+  Google or Microsoft** (OIDC + PKCE, linking on a verified email only), a
+  first-run owner bootstrap, and a **server-enforced one-hour idle logout**.
 - **Studio** — projects rail (create / rename / duplicate / trash / restore),
   a model picker grouped by tier, a prompt composer that shows the exact credit
   cost before you submit, chat-style "ask for a change" editing, and a live
@@ -24,6 +25,10 @@ PostgreSQL, Higgsfield for generation, and Stripe for billing.
   (serializable) spend, and automatic refunds when a job fails or is withheld.
 - **Owner console** — `/admin`, owner-only, listing every account with a live
   green "active now" dot, plan, subscription status and usage.
+- **Analytics** — `/admin/analytics`, owner-only. First-party traffic
+  (visitors, views, bounce rate, time on page, pages, referrers, countries,
+  devices, campaigns) alongside audience, revenue, funnel and generation
+  metrics. No cookies, no third-party script, no IP addresses stored.
 - **Billing** — Stripe Checkout for the four plans and a signed, idempotent
   webhook that is the only place a plan is ever granted.
 
@@ -68,11 +73,89 @@ auth, projects and the studio UI before wiring the paid integrations.
 See `.env.example`. Summary:
 
 - `DATABASE_URL` — Postgres (required).
-- `APP_URL`, `OWNER_EMAIL`, `WEBHOOK_SECRET` — app config.
+- `APP_URL`, `OWNER_EMAIL`, `WEBHOOK_SECRET` — app config. `WEBHOOK_SECRET` also
+  salts the analytics visitor hash, so changing it resets unique-visitor
+  counting from that day on.
+- `GOOGLE_CLIENT_ID` / `_SECRET`, `MICROSOFT_CLIENT_ID` / `_SECRET` /
+  `MICROSOFT_TENANT_ID` — optional social sign-in.
 - `HIGGSFIELD_API_KEY_ID` / `_SECRET` — server-side generation credentials from
   [Higgsfield Cloud](https://cloud.higgsfield.ai). Optional
   `HIGGSFIELD_ENDPOINT_MAP` overrides model→endpoint paths without a redeploy.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_*` — billing.
+
+## Sign in with Google and Microsoft
+
+Both are optional and configured purely from the environment — a provider with
+no credentials is not rendered on the sign-in pages at all, so the site runs
+fine with neither.
+
+Redirect URIs to register, where `<APP_URL>` is your deployed origin:
+
+```
+<APP_URL>/api/auth/oauth/google/callback
+<APP_URL>/api/auth/oauth/microsoft/callback
+```
+
+- **Google** — [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials),
+  OAuth 2.0 Client ID of type *Web application*. Set `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET`.
+- **Microsoft** — [entra.microsoft.com](https://entra.microsoft.com) →
+  App registrations. Set `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
+  `MICROSOFT_TENANT_ID` defaults to `common` (work, school and personal
+  accounts); set a directory id to restrict sign-in to one tenant.
+
+The flow is authorization-code with PKCE, hand-rolled in `src/lib/oauth.ts`
+rather than delegated to Auth.js, because the session model here is already
+database-backed and drives both the idle logout and the owner console's
+activity dot — adopting a library's session handling would mean rewriting both.
+
+**Account linking is deliberately strict.** A returning identity is matched on
+the provider's `sub` claim. A *new* identity whose email already belongs to an
+account only links when the provider asserts `email_verified`; otherwise it is
+refused and the visitor is sent back to the password form. Without that check,
+anyone who could set an arbitrary unverified address at a provider could walk
+into an existing account.
+
+## Analytics
+
+`/admin/analytics`, owner-only, enforced in the page in front of the query it
+guards. A signed-in non-owner is redirected to `/studio` rather than shown a
+403, which avoids confirming the URL exists.
+
+Traffic is collected first-party by a small beacon in the root layout that fires
+on every App Router navigation — a client-side route change never reaches the
+server and would otherwise be invisible. A second `sendBeacon` on `pagehide`
+records time on page.
+
+- **No cookies and no IP storage.** A visitor is counted by
+  `SHA-256(ip + user-agent + daily salt)`. The salt contains the UTC date, so
+  the same person hashes differently tomorrow and the value is not a durable
+  identifier. The only client-side state is a random id in `sessionStorage`
+  that dies with the tab.
+- **Bots are dropped** at ingest rather than filtered in the dashboard.
+- **Geo** comes from Vercel's edge headers (`x-vercel-ip-country` and friends),
+  so there is no IP database to ship. It is blank on localhost — that panel
+  stays empty until you deploy.
+- **Business metrics are not duplicated.** Accounts, plans, MRR, generations and
+  credit spend are read from the tables that already own them, so the dashboard
+  cannot disagree with what the app actually did.
+
+Nothing needs configuring: it is part of the app, so it starts collecting on the
+Vercel deployment as soon as that deployment is live.
+
+## Creating the owner account
+
+Registration bootstraps the first account as owner, but that is whoever signs up
+first. To do it deliberately, including against production:
+
+```bash
+npm run seed:owner -- --email you@example.com
+npm run seed:owner -- --email you@example.com --password 'your password'
+```
+
+With no `--password` a strong one is generated and printed once. Re-running is
+safe — an existing account is promoted to `OWNER`, and its password only changes
+if `--password` was supplied.
 
 ## Deploying
 
@@ -134,5 +217,6 @@ smoke-tested before the paid integrations are wired.
 
 - `npm run dev` / `build` / `start` — `build` runs `prisma generate` first
 - `npm run lint`
+- `npm run seed:owner -- --email you@example.com` — create/promote the owner
 - `npx prisma migrate deploy` — apply migrations
 - `npx prisma studio` — inspect the database

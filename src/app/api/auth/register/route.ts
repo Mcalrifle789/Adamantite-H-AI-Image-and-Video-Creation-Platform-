@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { clientIp, HttpError, route } from "@/lib/api";
 import { createSession, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { track } from "@/lib/analytics";
 import { registerSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -43,6 +44,8 @@ export const POST = route(async (req: Request) => {
     userAgent: req.headers.get("user-agent"),
     ip: clientIp(req),
   });
+
+  await track("signup", { userId: user.id, meta: { method: "password" } });
 
   return NextResponse.json({ user }, { status: 201 });
 });

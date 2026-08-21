@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Analytics from "@/components/Analytics";
 import "./globals.css";
 
 /*
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-void text-chrome">
         {children}
+        <Analytics />
       </body>
     </html>
   );

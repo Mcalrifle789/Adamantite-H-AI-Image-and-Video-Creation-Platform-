@@ -44,12 +44,20 @@ export default async function SiteHeader() {
             </Link>
           ) : null}
           {user?.role === "OWNER" ? (
-            <Link
-              href="/admin"
-              className="text-crimson-400 hover:text-crimson-300 transition-colors"
-            >
-              Owner
-            </Link>
+            <>
+              <Link
+                href="/admin"
+                className="text-crimson-400 hover:text-crimson-300 transition-colors"
+              >
+                Owner
+              </Link>
+              <Link
+                href="/admin/analytics"
+                className="text-crimson-400 hover:text-crimson-300 transition-colors"
+              >
+                Analytics
+              </Link>
+            </>
           ) : null}
         </div>
 

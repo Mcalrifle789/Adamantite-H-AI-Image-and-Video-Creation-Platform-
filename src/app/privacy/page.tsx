@@ -37,8 +37,10 @@ export default function PrivacyPage() {
             email, a hashed password, your session records, your projects and
             your generations. Your prompts go to the model provider that runs
             the generation, and your card details go to Stripe and never touch
-            our servers. We do not sell anything, we do not run advertising
-            trackers, and we do not train models on your work.
+            our servers. We count page views ourselves, without cookies and
+            without storing your IP address. We do not sell anything, we run no
+            third-party or advertising trackers, and we do not train models on
+            your work.
           </p>
         </div>
 
@@ -75,6 +77,14 @@ export default function PrivacyPage() {
             generated.
           </p>
           <p>
+            <strong className="text-chrome">Linked sign-in accounts.</strong> If
+            you sign in with Google or Microsoft we store that provider&apos;s
+            permanent identifier for you, the email address it gave us, and when
+            you last used it. We ask those providers only for your name, email
+            and profile — never your contacts, files or mail — and we never
+            receive your password.
+          </p>
+          <p>
             <strong className="text-chrome">Billing data.</strong> Your plan,
             subscription status, period dates, and the Stripe customer and
             subscription identifiers.{" "}
@@ -89,9 +99,32 @@ export default function PrivacyPage() {
             rather than merely asserted.
           </p>
           <p>
-            We do not use advertising or analytics trackers, and we set no
-            third-party cookies. The only cookie we set is the session cookie,
-            which is strictly necessary to keep you signed in.
+            <strong className="text-chrome">Analytics.</strong> We record a row
+            per page view: the path, the referring site&apos;s domain, how long
+            the page was open, your browser, operating system and device type,
+            any campaign tag in the link you followed, and the country, region
+            and city our host resolves from your connection.
+          </p>
+          <p>
+            That row carries no name and no address. Repeat visits are counted
+            through a one-way hash of your IP and browser string mixed with a
+            salt that changes every day, so the same person is a different value
+            tomorrow and the hash cannot be reversed to an address.{" "}
+            <strong className="text-chrome">
+              We do not store IP addresses.
+            </strong>{" "}
+            If you happen to be signed in, the view is linked to your account so
+            we can tell customers from strangers.
+          </p>
+          <p>
+            The analytics are ours and run on our own servers. There is no
+            Google Analytics, no advertising pixel, no third-party script and no
+            data broker. We set{" "}
+            <strong className="text-chrome">no analytics cookie</strong> — the
+            only cookies on this site are the session cookie that keeps you
+            signed in and a short-lived one used during Google or Microsoft
+            sign-in. Both are strictly necessary, which is why you are not
+            shown a consent banner.
           </p>
         </Section>
 
@@ -104,6 +137,11 @@ export default function PrivacyPage() {
             <li>
               Billing and usage data — to perform the contract, and to meet
               accounting and tax obligations.
+            </li>
+            <li>
+              Analytics — our legitimate interest in understanding how the site
+              is used. It is measured in a form that cannot identify you, which
+              is what makes that basis appropriate rather than consent.
             </li>
             <li>
               Security and abuse records — our legitimate interest in keeping
@@ -122,6 +160,11 @@ export default function PrivacyPage() {
           <p>
             <strong className="text-chrome">Stripe.</strong> Payment processing
             and subscription management.
+          </p>
+          <p>
+            <strong className="text-chrome">Google and Microsoft.</strong> Only
+            if you choose to sign in with them, and only to verify who you are.
+            We send them no information about what you do on this site.
           </p>
           <p>
             <strong className="text-chrome">Hosting and database providers.</strong>{" "}
@@ -155,6 +198,10 @@ export default function PrivacyPage() {
               Sessions: cleared once expired, which is at most thirty days after
               sign-in and typically within {IDLE_HOURS} hour
               {IDLE_HOURS === 1 ? "" : "s"} of your last activity.
+            </li>
+            <li>
+              Analytics rows: 14 months, then deleted. They are not tied to an
+              identity, so closing your account does not remove them.
             </li>
             <li>
               Billing and ledger records: retained after account closure for as

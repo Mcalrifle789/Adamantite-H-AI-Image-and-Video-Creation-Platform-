@@ -53,7 +53,8 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   displayName  String
-  passwordHash String
+  // Null for accounts that only ever signed in through Google or Microsoft.
+  passwordHash String?
   role         Role     @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -68,6 +69,7 @@ model User {
   periodEnd          DateTime?
 
   sessions    Session[]
+  accounts    Account[]
   projects    Project[]
   generations Generation[]
   usage       UsageEntry[]
@@ -169,4 +171,87 @@ model UsageEntry {
 model ProcessedWebhookEvent {
   id          String   @id
   processedAt DateTime @default(now())
+}
+
+enum AuthProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+// A linked OIDC identity. One user can hold several, so signing in with Google
+// and later with Microsoft on the same verified email lands on one account
+// rather than silently forking into two.
+model Account {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          AuthProvider
+  // The provider's stable subject claim, never the email: addresses get
+  // reassigned and changed, `sub` does not.
+  providerAccountId String
+  email             String?
+  createdAt         DateTime     @default(now())
+  lastLoginAt       DateTime     @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+enum DeviceKind {
+  DESKTOP
+  MOBILE
+  TABLET
+  BOT
+}
+
+/**
+ * First-party analytics.
+ * No cookies and no third-party script. A visitor is identified by
+ * `visitorHash` = SHA-256(ip + user-agent + daily salt), which counts uniques
+ * per day without ever storing an address. The salt rotates at midnight UTC, so
+ * yesterday's hashes cannot be correlated with today's.
+ */
+model PageView {
+  id           String     @id @default(cuid())
+  path         String
+  referrerHost String?
+  visitorHash  String
+  // Anonymous per-tab id from sessionStorage, for bounce rate and time on page.
+  clientId     String?
+  // Set only when the visitor happened to be signed in.
+  userId       String?
+  country      String?
+  region       String?
+  city         String?
+  device       DeviceKind @default(DESKTOP)
+  browser      String?
+  os           String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  // Written by a second beacon when the page is closed; null while still open.
+  durationMs   Int?
+  createdAt    DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([path, createdAt])
+  @@index([visitorHash, createdAt])
+  @@index([clientId])
+}
+
+// Funnel steps that are not already derivable from another table. Signups,
+// generations and revenue are read from User/Generation/UsageEntry instead of
+// being duplicated here.
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  name      String
+  path      String?
+  userId    String?
+  clientId  String?
+  // Small JSON bag, e.g. the plan a checkout was started for.
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
 }
